@@ -24,6 +24,7 @@ of database objects.
    management_basics
    backup_and_restore
    developer_tools
+   startup_performance_diagnosis
    processes
    pgagent
    contributions
