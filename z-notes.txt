@@ -1,0 +1,47 @@
+You are modifying pgAdmin backend startup logic (Python/Flask side).
+
+Goal:
+Reduce unnecessary work during startup by skipping redundant database validation and checks when the schema is already up-to-date.
+
+Background:
+- pgAdmin uses Alembic for database migrations.
+- The current database schema version is stored in the "alembic_version" table.
+- The latest schema version is determined from migration files located in:
+  web/migrations/versions/
+- On startup, pgAdmin currently performs:
+  - Migration checks
+  - Table validation via check_db_tables()
+  - Other schema-related verification steps
+- These operations run even when the schema is already at the latest version.
+
+Problem:
+- When no migrations are pending, running full validation and checks adds unnecessary startup latency.
+- Most user startups fall into this "no changes" category.
+
+Task:
+- Implement a fast-path to detect when the database schema is already up-to-date.
+- Retrieve the current version from the "alembic_version" table.
+- Determine the latest migration version from the migration files.
+- Compare both versions:
+  - If they match:
+    - Skip redundant table validation (e.g., check_db_tables())
+    - Skip unnecessary migration-related checks
+  - If they do not match:
+    - Preserve existing behavior (run migrations and validation as usual)
+
+Constraints:
+- Make STRICTLY minimal changes to the existing code.
+- Do NOT modify migration logic or upgrade behavior.
+- Do NOT bypass migrations when required.
+- Do NOT introduce risk to data integrity.
+- Ensure fallback to full validation if anything is uncertain.
+- Keep implementation simple, readable, and localized.
+
+Edge cases:
+- If the "alembic_version" table is missing or unreadable → fall back to existing behavior.
+- If version comparison fails → fall back to existing behavior.
+- Do not assume schema correctness beyond version match; only skip clearly redundant work.
+
+Output:
+- Provide exact code changes (diff-style preferred).
+- Only include modified sections.
