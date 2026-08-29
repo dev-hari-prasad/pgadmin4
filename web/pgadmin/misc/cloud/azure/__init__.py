@@ -25,15 +25,6 @@ from pgacloud.utils.azure_cache import load_persistent_cache, \
 import os
 
 
-from azure.mgmt.rdbms.postgresql_flexibleservers import \
-    PostgreSQLManagementClient
-from azure.identity import AzureCliCredential, DeviceCodeCredential,\
-    AuthenticationRecord
-from azure.mgmt.resource import ResourceManagementClient
-from azure.mgmt.subscription import SubscriptionClient
-from azure.mgmt.rdbms.postgresql_flexibleservers.models import \
-    NameAvailabilityRequest
-
 MODULE_NAME = 'azure'
 
 
@@ -265,6 +256,34 @@ def clear_session():
     return make_json_response(success=1)
 
 
+def _azure_sdk():
+    """Defer heavy Azure SDK imports until required by user actions.
+    Repeat calls are cheap via sys.modules caching.
+    """
+    from types import SimpleNamespace
+    from azure.identity import (
+        AzureCliCredential, DeviceCodeCredential, AuthenticationRecord
+    )
+    from azure.mgmt.rdbms.postgresql_flexibleservers import (
+        PostgreSQLManagementClient
+    )
+    from azure.mgmt.rdbms.postgresql_flexibleservers.models import (
+        NameAvailabilityRequest
+    )
+    from azure.mgmt.resource import ResourceManagementClient
+    from azure.mgmt.subscription import SubscriptionClient
+
+    return SimpleNamespace(
+        AzureCliCredential=AzureCliCredential,
+        DeviceCodeCredential=DeviceCodeCredential,
+        AuthenticationRecord=AuthenticationRecord,
+        PostgreSQLManagementClient=PostgreSQLManagementClient,
+        ResourceManagementClient=ResourceManagementClient,
+        SubscriptionClient=SubscriptionClient,
+        NameAvailabilityRequest=NameAvailabilityRequest,
+    )
+
+
 class Azure:
     def __init__(self, interactive_browser_credential, tenant_id=None,
                  session_token=None, region='eastus'):
@@ -367,7 +386,8 @@ class Azure:
 
     def _azure_cli_auth(self):
         if self._cli_credentials is None:
-            self._cli_credentials = AzureCliCredential()
+            sdk = _azure_sdk()
+            self._cli_credentials = sdk.AzureCliCredential()
             self.list_subscriptions()
         return self._cli_credentials
 
@@ -380,8 +400,9 @@ class Azure:
         session['azure']['azure_auth_code'] = azure_auth_code
 
     def _azure_interactive_auth(self):
+        sdk = _azure_sdk()
         if self.authentication_record_json is None:
-            _interactive_credential = DeviceCodeCredential(
+            _interactive_credential = sdk.DeviceCodeCredential(
                 tenant_id=self._tenant_id,
                 timeout=180,
                 prompt_callback=self._azure_interactive_auth_prompt_callback,
@@ -392,9 +413,9 @@ class Azure:
             _auth_record = _interactive_credential.authenticate()
             self.authentication_record_json = _auth_record.serialize()
         else:
-            deserialized_auth_record = AuthenticationRecord.deserialize(
+            deserialized_auth_record = sdk.AuthenticationRecord.deserialize(
                 self.authentication_record_json)
-            _interactive_credential = DeviceCodeCredential(
+            _interactive_credential = sdk.DeviceCodeCredential(
                 tenant_id=self._tenant_id,
                 timeout=180,
                 prompt_callback=self._azure_interactive_auth_prompt_callback,
@@ -411,15 +432,16 @@ class Azure:
             return self._clients[type]
 
         _, _credentials = self._get_azure_credentials()
+        sdk = _azure_sdk()
 
         if type == 'postgresql':
-            client = PostgreSQLManagementClient(_credentials,
-                                                self.subscription_id)
+            client = sdk.PostgreSQLManagementClient(_credentials,
+                                                    self.subscription_id)
         elif type == 'resource':
-            client = ResourceManagementClient(_credentials,
-                                              self.subscription_id)
+            client = sdk.ResourceManagementClient(_credentials,
+                                                  self.subscription_id)
         elif type == 'subscription':
-            client = SubscriptionClient(_credentials)
+            client = sdk.SubscriptionClient(_credentials)
 
         self._clients[type] = client
         return self._clients[type]
@@ -430,8 +452,9 @@ class Azure:
         :param cluster_name
         """
         postgresql_client = self._get_azure_client('postgresql')
+        sdk = _azure_sdk()
         res = postgresql_client.check_name_availability.execute(
-            NameAvailabilityRequest(
+            sdk.NameAvailabilityRequest(
                 name=cluster_name,
                 type='Microsoft.DBforPostgreSQL/flexibleServers'))
         res = res.__dict__

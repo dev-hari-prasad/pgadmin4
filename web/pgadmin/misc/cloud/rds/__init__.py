@@ -10,9 +10,7 @@
 # AWS RDS Cloud Deployment Implementation
 
 import requests
-import boto3
 import json
-from boto3.session import Session
 from flask_babel import gettext
 from flask import session, current_app, request
 from pgadmin.user_login_check import pga_login_required
@@ -152,6 +150,8 @@ def get_regions():
     """GET Regions for AWS."""
     try:
         clear_aws_session()
+        # Defer boto3.session (heavy import, user action only, cached)
+        from boto3.session import Session
         _session = Session()
         res = _session.get_available_regions('rds')
         regions = []
@@ -192,6 +192,8 @@ class RDS():
         if type in self._clients:
             return self._clients[type]
 
+        # Defer boto3 (heavy import, user action only, cached)
+        import boto3
         session = boto3.Session(
             aws_access_key_id=self._access_key,
             aws_secret_access_key=self._secret_key,
