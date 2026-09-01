@@ -206,3 +206,38 @@ class TestUnsafeDeserializerEliminatedFromAzureModule(
             "cloud.azure must not import the unsafe deserializer")
         self.assertNotIn(forbidden + '.dumps(', src)
         self.assertNotIn(forbidden + '.loads(', src)
+
+
+class TestAzureImportErrorHandling(
+        _SkipServerSetUpMixin, BaseTestGenerator):
+    """Azure methods must handle ImportError cleanly without raising."""
+
+    scenarios = [('default', dict())]
+
+    def runTest(self):
+        from unittest.mock import patch
+        from pgadmin.misc.cloud.azure import Azure
+        import pgadmin.misc.cloud.azure as azure_mod
+
+        a = Azure.from_state({'tenant_id': 'tid'})
+        with patch.object(
+                azure_mod, '_azure_sdk',
+                side_effect=ImportError('No module named azure.mgmt')):
+            client = a._get_azure_client('postgresql')
+            self.assertIsNone(client)
+
+            avail, msg = a.check_cluster_name_availability('server')
+            self.assertFalse(avail)
+            self.assertIn('azure.mgmt', msg)
+
+            subs = a.list_subscriptions()
+            self.assertEqual(subs, [])
+
+            rgs = a.list_resource_groups('sub-1')
+            self.assertEqual(rgs, [])
+
+            regs = a.list_regions('sub-1')
+            self.assertEqual(regs, [])
+
+            ha = a.is_zone_redundant_ha_supported('eastus')
+            self.assertFalse(ha)

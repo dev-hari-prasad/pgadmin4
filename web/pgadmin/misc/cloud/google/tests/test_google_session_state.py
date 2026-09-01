@@ -202,3 +202,36 @@ class TestUnsafeDeserializerEliminatedFromGoogleModule(
         self.assertNotIn(
             forbidden + '.loads(', src,
             "cloud.google must not call the unsafe deserialize call")
+
+
+class TestGoogleImportErrorHandling(
+        _SkipServerSetUpMixin, BaseTestGenerator):
+    """Google methods must cleanly return error strings on ImportError."""
+
+    scenarios = [('default', dict())]
+
+    def runTest(self):
+        from unittest.mock import patch
+        from pgadmin.misc.cloud.google import Google
+        import pgadmin.misc.cloud.google as google_mod
+
+        g = Google()
+        with patch.object(
+                google_mod, '_google_sdk',
+                side_effect=ImportError('No module named googleapiclient')):
+            projects, err_p = g.get_projects()
+            self.assertEqual(projects, [])
+            self.assertIn('googleapiclient', err_p)
+
+            regions, err_r = g.get_regions('test-project')
+            self.assertEqual(regions, [])
+            self.assertIn('googleapiclient', err_r)
+
+            inst_types, err_it = g.get_instance_types(
+                'test-project', 'us-central1')
+            self.assertEqual(inst_types, {})
+            self.assertIn('googleapiclient', err_it)
+
+            db_vers, err_dv = g.get_database_versions()
+            self.assertEqual(db_vers, [])
+            self.assertIn('googleapiclient', err_dv)

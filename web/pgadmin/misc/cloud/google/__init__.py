@@ -259,12 +259,11 @@ def get_instance_types(project_id, region, instance_class):
     """
     google_obj = _get_google_from_session()
     if google_obj is not None and project_id and region:
-        instance_types_dict = google_obj.get_instance_types(
+        instance_types_dict, error = google_obj.get_instance_types(
             project_id, region)
-        instance_types_list, error = (
-            instance_types_dict.get(instance_class, []))
         if error:
             return bad_request(errormsg=sanitize_external_text(error))
+        instance_types_list = instance_types_dict.get(instance_class, [])
         return make_json_response(data=instance_types_list)
     else:
         return make_json_response(data=[])
@@ -372,6 +371,9 @@ def clear_google_session():
 def _google_sdk():
     """Defer heavy Google API client imports until required by user actions.
     Repeat calls are cheap via sys.modules caching.
+
+    Note: The oauth2client sentinel installed at module import (line 39)
+    must precede this googleapiclient import. See issue #10110.
     """
     from types import SimpleNamespace
     from googleapiclient import discovery
@@ -555,7 +557,10 @@ class Google:
         """
         projects = []
         error = None
-        sdk = _google_sdk()
+        try:
+            sdk = _google_sdk()
+        except ImportError as e:
+            return projects, str(e)
         credentials = self._get_credentials(self._scopes)
         service = sdk.discovery.build('cloudresourcemanager',
                                       self._cloud_resource_manager_api_version,
@@ -579,7 +584,10 @@ class Google:
         :return:
         """
         self._project_id = project
-        sdk = _google_sdk()
+        try:
+            sdk = _google_sdk()
+        except ImportError as e:
+            return self._regions, str(e)
         credentials = self._get_credentials(self._scopes)
         service = sdk.discovery.build('compute',
                                       self._compute_api_version,
@@ -625,7 +633,10 @@ class Google:
         high_mem = []
         instance_types = {}
         error = None
-        sdk = _google_sdk()
+        try:
+            sdk = _google_sdk()
+        except ImportError as e:
+            return instance_types, str(e)
         credentials = self._get_credentials(self._scopes)
         service = sdk.discovery.build('sqladmin',
                                       self._sqladmin_api_version,
@@ -674,7 +685,10 @@ class Google:
         pg_database_versions = []
         database_versions = []
         error = None
-        sdk = _google_sdk()
+        try:
+            sdk = _google_sdk()
+        except ImportError as e:
+            return database_versions, str(e)
         credentials = self._get_credentials(self._scopes)
         service = sdk.discovery.build('sqladmin',
                                       self._sqladmin_api_version,

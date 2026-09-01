@@ -431,8 +431,14 @@ class Azure:
         if type in self._clients:
             return self._clients[type]
 
-        _, _credentials = self._get_azure_credentials()
-        sdk = _azure_sdk()
+        status, _credentials = self._get_azure_credentials()
+        if not status:
+            return None
+
+        try:
+            sdk = _azure_sdk()
+        except ImportError:
+            return None
 
         if type == 'postgresql':
             client = sdk.PostgreSQLManagementClient(_credentials,
@@ -451,8 +457,13 @@ class Azure:
         Checks whether given server name is available or not
         :param cluster_name
         """
+        try:
+            sdk = _azure_sdk()
+        except ImportError as e:
+            return False, str(e)
         postgresql_client = self._get_azure_client('postgresql')
-        sdk = _azure_sdk()
+        if not postgresql_client:
+            return False, 'Failed to initialize Azure client.'
         res = postgresql_client.check_name_availability.execute(
             sdk.NameAvailabilityRequest(
                 name=cluster_name,
@@ -465,13 +476,18 @@ class Azure:
         List subscriptions
         :return:
         """
-        subscription_client = self._get_azure_client('subscription')
-        sub_list = subscription_client.subscriptions.list()
         subscriptions_list = []
-        for group in list(sub_list):
-            subscriptions_list.append(
-                {'subscription_id': group.subscription_id,
-                 'subscription_name': group.display_name})
+        try:
+            subscription_client = self._get_azure_client('subscription')
+            if not subscription_client:
+                return subscriptions_list
+            sub_list = subscription_client.subscriptions.list()
+            for group in list(sub_list):
+                subscriptions_list.append(
+                    {'subscription_id': group.subscription_id,
+                     'subscription_name': group.display_name})
+        except ImportError:
+            return subscriptions_list
         return subscriptions_list
 
     def list_resource_groups(self, subscription_id):
@@ -481,14 +497,19 @@ class Azure:
         :return:
         """
         self.subscription_id = subscription_id
-        resource_client = self._get_azure_client('resource')
-        group_list = resource_client.resource_groups.list()
         resource_groups_list = []
-        for group in list(group_list):
-            resource_groups_list.append(
-                {'label': group.name,
-                 'value': group.name,
-                 'region': group.location})
+        try:
+            resource_client = self._get_azure_client('resource')
+            if not resource_client:
+                return resource_groups_list
+            group_list = resource_client.resource_groups.list()
+            for group in list(group_list):
+                resource_groups_list.append(
+                    {'label': group.name,
+                     'value': group.name,
+                     'region': group.location})
+        except ImportError:
+            return resource_groups_list
         return resource_groups_list
 
     def list_regions(self, subscription_id):
@@ -498,13 +519,18 @@ class Azure:
         :return:
         """
         self.subscription_id = subscription_id
-        subscription_client = self._get_azure_client('subscription')
-        locations = subscription_client.subscriptions.list_locations(
-            subscription_id=self.subscription_id)
         locations_list = []
-        for location in locations:
-            locations_list.append(
-                {'label': location.display_name, 'value': location.name})
+        try:
+            subscription_client = self._get_azure_client('subscription')
+            if not subscription_client:
+                return locations_list
+            locations = subscription_client.subscriptions.list_locations(
+                subscription_id=self.subscription_id)
+            for location in locations:
+                locations_list.append(
+                    {'label': location.display_name, 'value': location.name})
+        except ImportError:
+            return locations_list
         return locations_list
 
     def is_zone_redundant_ha_supported(self, region):
@@ -515,8 +541,10 @@ class Azure:
         else:
             self._available_capabilities_list = \
                 self._get_available_capabilities_list(region)
-            return self._available_capabilities_list[0][
-                'zone_redundant_ha_supported']
+            if self._available_capabilities_list:
+                return self._available_capabilities_list[0][
+                    'zone_redundant_ha_supported']
+            return False
 
     def list_azure_availability_zones(self, region):
         """
@@ -620,6 +648,8 @@ class Azure:
         :return: azure capabilities object
         """
         postgresql_client = self._get_azure_client('postgresql')
+        if not postgresql_client:
+            return []
         return postgresql_client.location_based_capabilities.execute(
             location_name=region)
 
