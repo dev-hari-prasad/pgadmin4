@@ -270,7 +270,8 @@ class TestGoogleCallbackImportErrorHandling(
             self.assertFalse(ack_status)
             self.assertEqual(ack_err, res)
 
-            # Verify route handler returns 200 with error message instead of 500
+            # Verify route handler returns 200 with error message
+            # instead of 500
             session['google'] = {'state': g.to_state()}
             with patch.dict(
                     'sys.modules',
@@ -280,4 +281,3 @@ class TestGoogleCallbackImportErrorHandling(
             self.assertEqual(route_response.status_code, 200)
             self.assertIn('google_auth_oauthlib',
                           route_response.get_data(as_text=True))
-
