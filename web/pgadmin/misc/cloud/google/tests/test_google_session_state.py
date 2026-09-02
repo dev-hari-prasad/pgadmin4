@@ -235,3 +235,49 @@ class TestGoogleImportErrorHandling(
             db_vers, err_dv = g.get_database_versions()
             self.assertEqual(db_vers, [])
             self.assertIn('googleapiclient', err_dv)
+
+
+class TestGoogleCallbackImportErrorHandling(
+        _SkipServerSetUpMixin, BaseTestGenerator):
+    """Google.callback must cleanly handle missing google_auth_oauthlib."""
+
+    scenarios = [('default', dict())]
+
+    def runTest(self):
+        from flask import Flask, session
+        from unittest.mock import MagicMock, patch
+        from pgadmin.misc.cloud.google import Google
+        import pgadmin.misc.cloud.google as google_mod
+
+        app = Flask(__name__)
+        app.secret_key = 'test'
+        with app.test_request_context('/google/callback?state=xyz'):
+            session['state'] = 'xyz'
+            g = Google()
+            req = MagicMock()
+            req.url = 'http://localhost/google/callback?state=xyz'
+            req.args = {'state': 'xyz'}
+            with patch.dict(
+                    'sys.modules',
+                    {'google_auth_oauthlib': None,
+                     'google_auth_oauthlib.flow': None}):
+                res = g.callback(req)
+
+            self.assertIn('google_auth_oauthlib', res)
+            self.assertFalse(g._verification_successful)
+            self.assertEqual(g._verification_error, res)
+            ack_status, ack_err = g.verification_ack()
+            self.assertFalse(ack_status)
+            self.assertEqual(ack_err, res)
+
+            # Verify route handler returns 200 with error message instead of 500
+            session['google'] = {'state': g.to_state()}
+            with patch.dict(
+                    'sys.modules',
+                    {'google_auth_oauthlib': None,
+                     'google_auth_oauthlib.flow': None}):
+                route_response = google_mod.callback.__wrapped__()
+            self.assertEqual(route_response.status_code, 200)
+            self.assertIn('google_auth_oauthlib',
+                          route_response.get_data(as_text=True))
+

@@ -519,6 +519,10 @@ class Google:
             if self._verification_error == 'access_denied':
                 self._verification_error = 'Access denied.'
             return self._verification_error
+        except ImportError as er:
+            self._verification_successful = False
+            self._verification_error = str(er)
+            return self._verification_error
 
     @staticmethod
     def _credentials_to_dict(credentials):
