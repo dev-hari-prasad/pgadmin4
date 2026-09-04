@@ -565,11 +565,12 @@ class Google:
             sdk = _google_sdk()
         except ImportError as e:
             return projects, str(e)
-        credentials = self._get_credentials(self._scopes)
-        service = sdk.discovery.build('cloudresourcemanager',
-                                      self._cloud_resource_manager_api_version,
-                                      credentials=credentials)
         try:
+            credentials = self._get_credentials(self._scopes)
+            service = sdk.discovery.build(
+                'cloudresourcemanager',
+                self._cloud_resource_manager_api_version,
+                credentials=credentials)
             req = service.projects().list()
             res = req.execute()
             for project in res.get('projects', []):
@@ -592,12 +593,12 @@ class Google:
             sdk = _google_sdk()
         except ImportError as e:
             return self._regions, str(e)
-        credentials = self._get_credentials(self._scopes)
-        service = sdk.discovery.build('compute',
-                                      self._compute_api_version,
-                                      credentials=credentials)
         error = None
         try:
+            credentials = self._get_credentials(self._scopes)
+            service = sdk.discovery.build('compute',
+                                          self._compute_api_version,
+                                          credentials=credentials)
             req = service.regions().list(project=project)
             res = req.execute()
             for item in res.get('items', []):
@@ -641,11 +642,11 @@ class Google:
             sdk = _google_sdk()
         except ImportError as e:
             return instance_types, str(e)
-        credentials = self._get_credentials(self._scopes)
-        service = sdk.discovery.build('sqladmin',
-                                      self._sqladmin_api_version,
-                                      credentials=credentials)
         try:
+            credentials = self._get_credentials(self._scopes)
+            service = sdk.discovery.build('sqladmin',
+                                          self._sqladmin_api_version,
+                                          credentials=credentials)
             req = service.tiers().list(project=project)
             res = req.execute()
             for item in res.get('items', []):
@@ -693,11 +694,11 @@ class Google:
             sdk = _google_sdk()
         except ImportError as e:
             return database_versions, str(e)
-        credentials = self._get_credentials(self._scopes)
-        service = sdk.discovery.build('sqladmin',
-                                      self._sqladmin_api_version,
-                                      credentials=credentials)
         try:
+            credentials = self._get_credentials(self._scopes)
+            service = sdk.discovery.build('sqladmin',
+                                          self._sqladmin_api_version,
+                                          credentials=credentials)
             req = service.flags().list()
             res = req.execute()
             for item in res.get('items', []):
