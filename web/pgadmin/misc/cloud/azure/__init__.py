@@ -429,16 +429,16 @@ class Azure:
     def _get_azure_client(self, type):
         """ Create/cache/return an Azure client object """
         if type in self._clients:
-            return self._clients[type]
+            return self._clients[type], None
 
         status, _credentials = self._get_azure_credentials()
         if not status:
-            return None
+            return None, _credentials
 
         try:
             sdk = _azure_sdk()
-        except ImportError:
-            return None
+        except ImportError as e:
+            return None, str(e)
 
         if type == 'postgresql':
             client = sdk.PostgreSQLManagementClient(_credentials,
@@ -450,7 +450,7 @@ class Azure:
             client = sdk.SubscriptionClient(_credentials)
 
         self._clients[type] = client
-        return self._clients[type]
+        return self._clients[type], None
 
     def check_cluster_name_availability(self, cluster_name):
         """
@@ -461,9 +461,9 @@ class Azure:
             sdk = _azure_sdk()
         except ImportError as e:
             return False, str(e)
-        postgresql_client = self._get_azure_client('postgresql')
+        postgresql_client, error = self._get_azure_client('postgresql')
         if not postgresql_client:
-            return False, 'Failed to initialize Azure client.'
+            return False, error
         res = postgresql_client.check_name_availability.execute(
             sdk.NameAvailabilityRequest(
                 name=cluster_name,
@@ -478,15 +478,19 @@ class Azure:
         """
         subscriptions_list = []
         try:
-            subscription_client = self._get_azure_client('subscription')
+            subscription_client, error = self._get_azure_client('subscription')
             if not subscription_client:
+                if current_app:
+                    current_app.logger.error(error)
                 return subscriptions_list
             sub_list = subscription_client.subscriptions.list()
             for group in list(sub_list):
                 subscriptions_list.append(
                     {'subscription_id': group.subscription_id,
                      'subscription_name': group.display_name})
-        except ImportError:
+        except ImportError as e:
+            if current_app:
+                current_app.logger.error(str(e))
             return subscriptions_list
         return subscriptions_list
 
@@ -499,8 +503,10 @@ class Azure:
         self.subscription_id = subscription_id
         resource_groups_list = []
         try:
-            resource_client = self._get_azure_client('resource')
+            resource_client, error = self._get_azure_client('resource')
             if not resource_client:
+                if current_app:
+                    current_app.logger.error(error)
                 return resource_groups_list
             group_list = resource_client.resource_groups.list()
             for group in list(group_list):
@@ -508,7 +514,9 @@ class Azure:
                     {'label': group.name,
                      'value': group.name,
                      'region': group.location})
-        except ImportError:
+        except ImportError as e:
+            if current_app:
+                current_app.logger.error(str(e))
             return resource_groups_list
         return resource_groups_list
 
@@ -521,15 +529,19 @@ class Azure:
         self.subscription_id = subscription_id
         locations_list = []
         try:
-            subscription_client = self._get_azure_client('subscription')
+            subscription_client, error = self._get_azure_client('subscription')
             if not subscription_client:
+                if current_app:
+                    current_app.logger.error(error)
                 return locations_list
             locations = subscription_client.subscriptions.list_locations(
                 subscription_id=self.subscription_id)
             for location in locations:
                 locations_list.append(
                     {'label': location.display_name, 'value': location.name})
-        except ImportError:
+        except ImportError as e:
+            if current_app:
+                current_app.logger.error(str(e))
             return locations_list
         return locations_list
 
@@ -647,8 +659,10 @@ class Azure:
         :param region:
         :return: azure capabilities object
         """
-        postgresql_client = self._get_azure_client('postgresql')
+        postgresql_client, error = self._get_azure_client('postgresql')
         if not postgresql_client:
+            if current_app:
+                current_app.logger.error(error)
             return []
         return postgresql_client.location_based_capabilities.execute(
             location_name=region)
