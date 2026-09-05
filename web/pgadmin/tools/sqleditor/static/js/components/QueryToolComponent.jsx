@@ -284,7 +284,7 @@ export default function QueryToolComponent({params, pgWindow, pgAdmin, selectedN
     },
   };
 
-  const getSQLScript = async () => {
+  const getSQLScript = () => {
     // Fetch the SQL for Scripts (eg: CREATE/UPDATE/DELETE/SELECT)
     // Call AJAX only if script type URL is present
     if (qtState.params.is_query_tool && qtState.params.query_url) {
@@ -305,7 +305,7 @@ export default function QueryToolComponent({params, pgWindow, pgAdmin, selectedN
       }
       setQtStatePartial({ editor_disabled: false });
     } else if (qtState.params.restore === true) {
-      await restoreToolContent();
+      restoreToolContent();
     } else {
       setQtStatePartial({ editor_disabled: false });
     }
@@ -394,7 +394,7 @@ export default function QueryToolComponent({params, pgWindow, pgAdmin, selectedN
           obtaining_conn: false,
         });
         //this condition works if user is in View/Edit Data or user does not saved server or tunnel password and disconnected the server and executing the query
-        if(!qtState.params.is_query_tool || (reexecute && qtState.params.restore !== true)) {
+        if(!qtState.params.is_query_tool || reexecute) {
           eventBus.current.fireEvent(QUERY_TOOL_EVENTS.TRIGGER_EXECUTION, explainObject, macroSQL, executeCursor, executeServerCursor);
           let msg = `${selectedConn['server_name']}/${selectedConn['database_name']} - Database connected`;
           pgAdmin.Browser.notifier.success(_.escape(msg));
@@ -947,27 +947,31 @@ export default function QueryToolComponent({params, pgWindow, pgAdmin, selectedN
     eol: qtState.eol,
     connection_list: qtState.connection_list,
     current_file: qtState.current_file,
-    toggleQueryTool: () => setQtStatePartial((prev)=>{
+    toggleQueryTool: () => {
       let panel = qtPanelDocker?.find(qtPanelId);
-      if (panel?.metaData?.toolUrl) {
+      if (!panel) {
+        console.warn('toggleQueryTool: panel not found for qtPanelId', qtPanelId);
+      } else if (panel.metaData?.toolUrl) {
         try {
           const toolUrl = panel.metaData.toolUrl;
           const url = new URL(toolUrl, window.location.origin);
           url.searchParams.set('is_query_tool', 'true');
-          panel.metaData = Object.assign({}, panel.metaData, {toolUrl: url.toString()});
+          panel.metaData = Object.assign({}, panel.metaData, {
+            toolUrl: url.pathname + url.search,
+          });
           qtPanelDocker?.saveLayout();
         } catch (e) {
           console.warn(`Failed to update is_query_tool parameter for toolUrl "${panel?.metaData?.toolUrl}" using origin "${window.location.origin}":`, e);
         }
       }
-      return {
+      setQtStatePartial((prev) => ({
         ...prev,
         params: {
           ...prev.params,
-          is_query_tool: true
-        }
-      };
-    }),
+          is_query_tool: true,
+        },
+      }));
+    },
     updateTitle: (title) => {
       setPanelTitle(qtPanelDocker, qtPanelId, title, qtState, isDirtyRef.current);
       setQtStatePartial((prev) => {
